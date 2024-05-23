@@ -1,0 +1,114 @@
+package org.nqm.creater.controller.user;
+
+import java.io.IOException;
+import java.util.List;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+
+import org.nqm.creater.dto.BoxChat;
+import org.nqm.creater.model.SendMessage;
+import org.nqm.creater.model.User;
+import org.nqm.creater.service.SendMessageService;
+import org.nqm.creater.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+
+@Controller
+public class FormController {
+	
+	@Autowired
+	private SendMessageService sendMessageService;
+
+	@Autowired
+	private UserService userService;
+	
+	@RequestMapping(value = "/form", method=RequestMethod.GET)
+	public String getForm(final Model model,
+							final HttpServletRequest request) throws IOException{
+		// không cần sesion cứ request id của thằng mình ấm vào và của thằng mình đăng nhập userLongined
+		HttpSession session = request.getSession();
+		// kiểm tra xem đã có hội thoại chưa 
+		BoxChat boxChat = null;
+		if (session.getAttribute("boxChat") != null) {
+			boxChat = (BoxChat) session.getAttribute("boxChat");
+		}else {
+			boxChat = new BoxChat();
+			boxChat.setPartnerId(2);
+			boxChat.setSubjectId(1);
+			session.setAttribute("boxChat", boxChat);
+		}
+		
+		User partnerUser = userService.getById(boxChat.getPartnerId());
+		User subjectUser = userService.getById(boxChat.getSubjectId());
+		model.addAttribute("subjectUser", subjectUser);
+		model.addAttribute("partnerUser", partnerUser);
+		
+		List<SendMessage> getMessages = sendMessageService.getMessagesByUserId2(boxChat.getPartnerId(), boxChat.getSubjectId());
+		model.addAttribute("getMessages", getMessages);
+		int totalMessage = getMessages.size();
+		model.addAttribute("totalMessage", totalMessage);
+		
+		List<User> users = userService.findAll();
+		model.addAttribute("users", users);
+		return "user/form";	//http://localhost:7070/form
+	}
+	
+	@RequestMapping(value = "send-message", method=RequestMethod.POST)
+	public String sendMessage(final Model model,
+			final HttpServletRequest request,
+			final HttpServletResponse response) throws IOException {
+		
+		HttpSession session = request.getSession();
+		String message = request.getParameter("message");
+		// kiểm tra xem đã có hội thoại chưa 
+		BoxChat boxChat = null;
+		if (session.getAttribute("boxChat") != null) {
+			boxChat = (BoxChat) session.getAttribute("boxChat");
+		}else {
+			System.out.println("BOXCHAT IS NULL");
+			boxChat = new BoxChat();
+			boxChat.setPartnerId(2);
+			boxChat.setSubjectId(1);
+			session.setAttribute("boxChat", boxChat);
+		}
+		
+		// lấy message lưu vào send_mesage => mã hóa, sau đó lấy chuỗi mã hóa từ receivr_mesage lưu vào database
+		
+		
+		sendMessageService.saveToTblSendMessage(message, boxChat);
+		
+		
+		
+		
+		// lấy mã(content) từ database lưu vào receive_message => giải mã, sau đó lấy từ 
+		// C:\Users\Admin\Desktop\palrallel-workspace\creater\send_message.txt đẩy vào list
+		
+		
+		List<SendMessage> getMessages = sendMessageService.getMessagesByUserId2(boxChat.getPartnerId(), boxChat.getSubjectId());
+		
+		
+		model.addAttribute("getMessages", getMessages);
+		session.setAttribute("boxChat", boxChat);
+		
+		// put data
+		return "redirect:/form";
+	}
+	
+	
+	@RequestMapping(value = "chat-with/{userId}", method=RequestMethod.GET)
+	String changePartner(final Model model,
+			final HttpServletRequest request,
+			@PathVariable("userId") int userId) throws IOException {
+		HttpSession session = request.getSession();
+		BoxChat boxChat = (BoxChat) session.getAttribute("boxChat");
+		boxChat.setPartnerId(userId);
+		return "redirect:/form";
+	}
+	
+}
